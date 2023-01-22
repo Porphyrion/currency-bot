@@ -5,86 +5,95 @@ from aiogram.dispatcher.filters.state import State, StatesGroup
 from aiogram.types import (CallbackQuery, InlineKeyboardButton,
                            InlineKeyboardMarkup, Message)
 
-BOT_TOKEN = '424888719:AAFkATFsGPyA8-C34Y5ZMbGrXrDvXhZu0Zw'
+import currency_support
+
+BOT_TOKEN = ''
 
 storage: MemoryStorage = MemoryStorage()
 
 bot: Bot = Bot(BOT_TOKEN)
 dp: Dispatcher = Dispatcher(bot, storage=storage)
 
-user_dict = {}
+class FSMFChooseCPair(StatesGroup):
+    first_currency = State()
+    second_currency = State()
+    pair_created = State()
 
+def createButton(cur: currency_support.Currency)->InlineKeyboardButton:
+    return InlineKeyboardButton(text=cur.name, callback_data=cur.curryncyCode)
 
-def Currency:
-    def __init__(self, name: str, currencyCode:str):
-        self.name = name
-        self.curryncyCode = currencyCode
-
-
-
-def makeCurrencyKeyboard() -> InlineKeyboardMarkup:
+def makeCurrencyKeyboard(excluded = list()) -> InlineKeyboardMarkup:
     markup = InlineKeyboardMarkup()
+    currencisesButtonList = [createButton(item)  for item in currency_support.createInitalCurrenciesList() if item.curryncyCode not in excluded]
+  
+    for buttonID in range(0, len(currencisesButtonList), 2):
+        if buttonID+1 < len(currencisesButtonList):
+            markup.add(currencisesButtonList[buttonID], currencisesButtonList[buttonID+1])
+        else:
+            markup.row(currencisesButtonList[buttonID])
 
-    amd_button = InlineKeyboardButton(text='Армянский драм',
-                                            callback_data='amd')
-    rub_button = InlineKeyboardButton(text='Российский рубль',
-                                         callback_data='rub')
-    usd_button = InlineKeyboardButton(text='Американский доллар',
-                                         callback_data='usd')
-    eur_button = InlineKeyboardButton(text='Евро',
-                                         callback_data='eur')
+    return markup
 
-    markup.add(amd_button, rub_button).add(usd_button, eur_button)
 
 async def process_help_command(message: Message):
     await message.answer(text='Этот бот демонстрирует работу FSM\n\n'
                               'Чтобы перейти к заполнению анкеты - '
                               'отправьте команду /start')
 
+
 async def process_start_command(message: Message):
-    markup = InlineKeyboardMarkup()
-
-    amd_button = InlineKeyboardButton(text='Армянский драм',
-                                            callback_data='amd')
-    rub_button = InlineKeyboardButton(text='Российский рубль',
-                                         callback_data='rub')
-    usd_button = InlineKeyboardButton(text='Американский доллар',
-                                         callback_data='usd')
-    eur_button = InlineKeyboardButton(text='Евро',
-                                         callback_data='eur')
-
-    markup.add(amd_button, rub_button).add(usd_button, eur_button)
-
-    await message.answer(text='Спасибо!\n\nУкажите ваше образование',
+    markup = makeCurrencyKeyboard()
+    await message.answer(text='Выберите конвертиртируемую валюту\n',
                          reply_markup=markup)
+    await FSMFChooseCPair.first_currency.set()
+    print("Setting first state....")
 
 
-async def process_education_press(callback: CallbackQuery, state: FSMContext):
-
-    markup = InlineKeyboardMarkup()
-    amd_button = InlineKeyboardButton(text='Армянский драм',
-                                            callback_data='amd')
-    rub_button = InlineKeyboardButton(text='Российский рубль',
-                                         callback_data='rub')
-    usd_button = InlineKeyboardButton(text='Американский доллар',
-                                         callback_data='usd')
-    eur_button = InlineKeyboardButton(text='Евро',
-                                         callback_data='eur')
+async def process_set_second(callback: CallbackQuery, state: FSMFChooseCPair):
+    cur = callback.data
     
+    async with state.proxy() as data:
+        data['from'] = cur
     
-    await callback.message.edit_text(text='Спасибо!\n\n'
-                                          'Остался последний шаг.\n'
-                                          'Хотели бы вы получать новости?',
-                                     reply_markup=markup)
-    # Устанавливаем состояние ожидания выбора получать новости или нет
+    markup = makeCurrencyKeyboard(cur)
+
+    await callback.message.edit_text(text='Выберите валюту для ковертации\n',
+                         reply_markup=markup)
+    await FSMFChooseCPair.second_currency.set()
 
 
+async def process_finish(callback: CallbackQuery, state: FSMFChooseCPair):
+    cur = callback.data
+    
+    async with state.proxy() as data:
+        data['to'] = cur
+    
+    fromC, to = data['from'], data['to']
+    
+    await  callback.message.edit_text(text=f'{fromC}-{to}!\n')
+    await FSMFChooseCPair.pair_created.set()
+
+async def process_cancel_command(message: Message):
+    await message.answer(text='Вы вышли из машины состояний\n\n'
+                              'Чтобы снова перейти к заполнению анкеты - '
+                              'отправьте команду /fillform')
+    await state.reset_state()
 
 dp.register_message_handler(process_help_command,
                             commands='help')
 
 dp.register_message_handler(process_start_command,
                             commands='start')
+
+dp.register_callback_query_handler(process_set_second,
+                            state=FSMFChooseCPair.first_currency)
+
+dp.register_callback_query_handler(process_finish,
+                            state=FSMFChooseCPair.second_currency)
+
+dp.register_message_handler(process_cancel_command,
+                            commands='cancel',
+                            state='*')
 
 
 if __name__ == '__main__':

@@ -43,5 +43,7 @@ while command != "end":
        allCurrency()
     elif command in myCurrency:
         oneCur(command)
+    elif command == 'alll':
+        print(allCurrencyApi())
     
         
