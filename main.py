@@ -1,9 +1,13 @@
+import logging
 from aiogram import Bot, Dispatcher, executor
 from aiogram.contrib.fsm_storage.memory import MemoryStorage
 from aiogram.dispatcher import FSMContext
 from aiogram.dispatcher.filters.state import State, StatesGroup
 from aiogram.types import (CallbackQuery, InlineKeyboardButton,
                            InlineKeyboardMarkup, Message)
+
+
+import emoji
 
 import currency_support
 
@@ -20,26 +24,27 @@ class FSMFChooseCPair(StatesGroup):
     pair_created = State()
 
 def createButton(cur: currency_support.Currency)->InlineKeyboardButton:
-    return InlineKeyboardButton(text=cur.name, callback_data=cur.curryncyCode)
+    return InlineKeyboardButton(text=emoji.emojize(cur.name+' '+cur.emoji), callback_data=cur.curryncyCode)
 
 def makeCurrencyKeyboard(excluded = list()) -> InlineKeyboardMarkup:
-    markup = InlineKeyboardMarkup()
-    currencisesButtonList = [createButton(item)  for item in currency_support.createInitalCurrenciesList() if item.curryncyCode not in excluded]
-  
-    for buttonID in range(0, len(currencisesButtonList), 2):
-        if buttonID+1 < len(currencisesButtonList):
-            markup.add(currencisesButtonList[buttonID], currencisesButtonList[buttonID+1])
-        else:
-            markup.row(currencisesButtonList[buttonID])
-
+    markup = InlineKeyboardMarkup(row_width = 2)
+    [markup.insert(createButton(item)) for item in currency_support.createInitalCurrenciesList() if item.curryncyCode not in excluded]
     return markup
 
-
+def addMenu(markup: InlineKeyboardMarkup) -> InlineKeyboardMarkup:
+    acceptButton = InlineKeyboardButton(text=emoji.emojize("Принять"+':check_mark_button:'), callback_data="accept")
+    cancelButton = InlineKeyboardButton(text=emoji.emojize("Отменить"+':X:'), callback_data="cancel")
+    backButton = InlineKeyboardButton(text=emoji.emojize("Назад"+':BACK_arrow:'), callback_data="back")
+    
+    markup.row(acceptButton, cancelButton, backButton)
+    
+    return markup
+    
+    
 async def process_help_command(message: Message):
     await message.answer(text='Этот бот демонстрирует работу FSM\n\n'
                               'Чтобы перейти к заполнению анкеты - '
                               'отправьте команду /start')
-
 
 async def process_start_command(message: Message):
     markup = makeCurrencyKeyboard()
@@ -48,7 +53,6 @@ async def process_start_command(message: Message):
     await FSMFChooseCPair.first_currency.set()
     print("Setting first state....")
 
-
 async def process_set_second(callback: CallbackQuery, state: FSMFChooseCPair):
     cur = callback.data
     
@@ -56,11 +60,11 @@ async def process_set_second(callback: CallbackQuery, state: FSMFChooseCPair):
         data['from'] = cur
     
     markup = makeCurrencyKeyboard(cur)
+    markup = addMenu(markup)
 
     await callback.message.edit_text(text='Выберите валюту для ковертации\n',
                          reply_markup=markup)
     await FSMFChooseCPair.second_currency.set()
-
 
 async def process_finish(callback: CallbackQuery, state: FSMFChooseCPair):
     cur = callback.data
@@ -73,11 +77,6 @@ async def process_finish(callback: CallbackQuery, state: FSMFChooseCPair):
     await  callback.message.edit_text(text=f'{fromC}-{to}!\n')
     await FSMFChooseCPair.pair_created.set()
 
-async def process_cancel_command(message: Message):
-    await message.answer(text='Вы вышли из машины состояний\n\n'
-                              'Чтобы снова перейти к заполнению анкеты - '
-                              'отправьте команду /fillform')
-    await state.reset_state()
 
 dp.register_message_handler(process_help_command,
                             commands='help')
@@ -90,10 +89,6 @@ dp.register_callback_query_handler(process_set_second,
 
 dp.register_callback_query_handler(process_finish,
                             state=FSMFChooseCPair.second_currency)
-
-dp.register_message_handler(process_cancel_command,
-                            commands='cancel',
-                            state='*')
 
 
 if __name__ == '__main__':
