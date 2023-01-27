@@ -1,22 +1,28 @@
 import logging
-from aiogram import Bot, Dispatcher, executor
+from aiogram import Bot, Dispatcher, executor, types
 from aiogram.contrib.fsm_storage.memory import MemoryStorage
 from aiogram.dispatcher import FSMContext
 from aiogram.dispatcher.filters.state import State, StatesGroup
 from aiogram.types import (CallbackQuery, InlineKeyboardButton,
                            InlineKeyboardMarkup, Message)
 
-
 import emoji
 
 import currency_support
+from  utils.config_processor import DotEnvHelper
 
-BOT_TOKEN = ''
-
+env: DotEnvHelper  = DotEnvHelper()
 storage: MemoryStorage = MemoryStorage()
-
-bot: Bot = Bot(BOT_TOKEN)
+bot: Bot = Bot(env.get_value(env.BOT_TOKEN_FIELD))
 dp: Dispatcher = Dispatcher(bot, storage=storage)
+
+async def set_main_menu(dp: Dispatcher):
+    print("set")
+    main_menu_commands = [
+        types.BotCommand(command='/help', description='Справка по работе бота'),
+        types.BotCommand(command='/start', description='Выбрать валюту для быстрого перевода')
+    ]
+    await dp.bot.set_my_commands(main_menu_commands)
 
 class FSMFChooseCPair(StatesGroup):
     first_currency = State()
@@ -39,7 +45,6 @@ def addMenu(markup: InlineKeyboardMarkup) -> InlineKeyboardMarkup:
     markup.row(acceptButton, cancelButton, backButton)
     
     return markup
-    
     
 async def process_help_command(message: Message):
     await message.answer(text='Этот бот демонстрирует работу FSM\n\n'
@@ -90,6 +95,7 @@ dp.register_callback_query_handler(process_set_second,
 dp.register_callback_query_handler(process_finish,
                             state=FSMFChooseCPair.second_currency)
 
+set_main_menu(dp)
 
 if __name__ == '__main__':
-    executor.start_polling(dp, skip_updates=True)
+    executor.start_polling(dp, skip_updates=True, on_startup=set_main_menu)
