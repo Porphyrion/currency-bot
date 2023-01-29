@@ -35,14 +35,16 @@ async def process_set_to(callback: CallbackQuery, state: FSMContext):
             data['to'].append(res) 
             fromC, to = data['from'], data['to']
             to = ' '.join(to)
-            await  callback.message.edit_text(text=f'{fromC}-{to}!\n')
+            await  callback.message.edit_text(text=f'{fromC}--->{to}!\n')
             await  FSMFastConversion.currencies_choosed.set()
+            return
     # elif res == 'cancel':
     #     async with state.proxy() as data:
     #         excluded  = data['to'].pop()
     #         await callback.message.edit_text(text='Выберите валюты для ковертации\n',
     #                      reply_markup=updateCurrencyKeyboard(callback.message.reply_markup, excluded))
     #         await  FSMFChooseCPair.currencies_chosed.set()
+    #         return
     elif res == 'back':
         async with state.proxy() as data:
             data['to'] = list()
@@ -51,6 +53,7 @@ async def process_set_to(callback: CallbackQuery, state: FSMContext):
             await callback.message.edit_text(text='Выберите конвертиртируемую валюту\n',
                          reply_markup=markup)
             await FSMFastConversion.set_from_currency.set()
+            return
     
     async with state.proxy() as data:
         data['to'].append(res)

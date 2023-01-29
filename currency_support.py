@@ -13,7 +13,7 @@ class Currency:
         self.curryncyCode = currencyCode
         self.emoji = emoji
     
-def createInitalCurrenciesList():
+def createInital_currencies_list():
     return [Currency('Армянский драм', AMD_CODE, ':Armenia:'), Currency('Российский рубль', RUB_CODE, ':skull:'), 
             Currency('Американский доллар', USD_CODE, ':United_States:'), Currency('Евро', EUR_CODE, ':European_Union:'), 
             Currency('Турецкая лира', TRY_CODE,':Turkey:'), Currency('Грузинский лари', GEL_CODE, ':Georgia:')]
